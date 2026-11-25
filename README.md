@@ -2,7 +2,7 @@
 
 [![Model Context Protocol](https://img.shields.io/badge/MCP-Compatible-blue.svg)](https://modelcontextprotocol.io)
 [![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
-[![Tools: 29](https://img.shields.io/badge/tools-29%20available-green.svg)](#-available-mcp-tools-29-tools)
+[![Tools: 30](https://img.shields.io/badge/tools-30%20available-green.svg)](#-available-mcp-tools-30-tools)
 [![CI](https://github.com/ChimbuezeDavid/linkedin-mcp/actions/workflows/ci.yml/badge.svg)](https://github.com/ChimbuezeDavid/linkedin-mcp/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
@@ -21,7 +21,7 @@ A production-grade Model Context Protocol (MCP) server that connects your AI ass
 
 ### ✅ The Solution
 
-1. **Full 29-Tool Platform Without API Keys**: Provides your AI with complete human capabilities—profile editing, rich posting (with images/PDFs), interactive polls, inbox history, connection management, analytics, and executive intelligence briefings.
+1. **Full 30-Tool Platform Without API Keys**: Provides your AI with complete human capabilities—profile editing, rich posting (with images/PDFs), post & Pulse article reading, interactive polls, inbox history, connection management, analytics, and executive intelligence briefings.
 2. **Native Google Chrome Stealth Engine**: Uses your computer's real, native Google Chrome installation rather than generic Chromium binaries. Strips automation markers (`navigator.webdriver`), introduces human typing delay jitter, and executes natural Bezier-curve mouse movements.
 3. **Passwordless, 2FA-Friendly Session Management**: Never asks for or stores your plaintext LinkedIn password. You log in interactively once through your real browser, solve any 2FA challenge, and the encrypted session state is saved locally to `~/.linkedin_mcp`. Built-in keep-alive telemetry extends LinkedIn's 30-day sliding activity window automatically.
 4. **Mathematical Account Boundaries**: Profile mutation tools (`update_my_headline`, `update_my_about`, `add_experience`, etc.) **do not accept a target profile parameter**. They are hardcoded to `/in/me`. It is mathematically impossible for an AI to modify an external profile.
@@ -210,7 +210,7 @@ To configure your AI client to point to your local code:
 
 ---
 
-## 🛠️ Available MCP Tools (29 Tools)
+## 🛠️ Available MCP Tools (30 Tools)
 
 All tools operate strictly within the authenticated account boundary and enforce `@require_auth`.
 
@@ -232,6 +232,7 @@ All tools operate strictly within the authenticated account boundary and enforce
 | **Browsing & Search** | `search_people` | `keywords`, `location`, `current_company`, `limit` | Searches LinkedIn for professionals with connection degree badges (1st/2nd/3rd). |
 | | `view_profile` | `profile_url` | Reads any member's public/network profile details in read-only mode. |
 | **Feed, Posts & Polls** | `get_feed` | `limit` | Reads recent posts from your personal home feed. |
+| | `read_post` | `post_url`, `include_comments`, `comment_limit` | Reads a specific LinkedIn post or Pulse article by URL in read-only mode. |
 | | `create_post` | `text`, `media_path` *(optional)* | Publishes a post authored by your account, optionally attaching image/PDF. |
 | | `create_poll` | `question`, `options`, `duration` | Publishes an interactive poll to your feed (2-4 options, custom duration). |
 | | `comment_on_post` | `post_url`, `comment_text` | Comments on a post as your authenticated profile. |
@@ -258,7 +259,7 @@ uv run python -m unittest discover tests
 
 Expected output:
 ```
-Ran 12 tests in 0.015s
+Ran 15 tests in 0.062s
 
 OK
 ```

@@ -169,6 +169,43 @@ class TestLinkedInGuardrails(unittest.TestCase):
             health = auth_manager.get_session_health()
             self.assertEqual(health["status"], "STALE_REAUTH_RECOMMENDED")
 
+    def test_unauthenticated_guardrail_blocks_read_post(self):
+        """Ensure that attempting to read a post by URL without auth fails cleanly."""
+        with patch("linkedin_mcp.auth.session_guard.ensure_authenticated_session", side_effect=session_guard.UnauthenticatedError("Not logged in")):
+            result = asyncio.run(posts.read_post(post_url="https://www.linkedin.com/posts/example_123"))
+            self.assertFalse(result["success"])
+            self.assertEqual(result["boundary_status"], "BLOCKED_UNAUTHENTICATED")
+
+    def test_read_post_rejects_empty_and_external_urls(self):
+        """Ensure read_post rejects empty, non-HTTP, external, and non-post LinkedIn URLs."""
+        with patch("linkedin_mcp.auth.session_guard.ensure_authenticated_session"):
+            empty_res = asyncio.run(posts.read_post(post_url="   "))
+            self.assertFalse(empty_res["success"])
+            self.assertEqual(empty_res["error"], "EMPTY_URL")
+
+            for bad_url in [
+                "https://evil.com/posts/123",
+                "file:///etc/passwd",
+                "https://www.linkedin.com/in/someone-else/",
+                "https://lnkd.in/",
+            ]:
+                res = asyncio.run(posts.read_post(post_url=bad_url))
+                self.assertFalse(res["success"], f"Expected {bad_url} to be rejected")
+                self.assertEqual(res["error"], "INVALID_POST_URL")
+
+    def test_read_post_accepts_valid_post_formats(self):
+        """Ensure URL normalizer accepts standard LinkedIn post, activity, pulse, and lnkd.in links."""
+        valid_urls = [
+            "https://www.linkedin.com/posts/username_ai-mcp-activity-1234567890-abcd/",
+            "http://linkedin.com/feed/update/urn:li:activity:1234567890/",
+            "https://www.linkedin.com/pulse/some-article-title-author/",
+            "https://lnkd.in/dXyZ123",
+        ]
+        for url in valid_urls:
+            normalized, err = posts._validate_and_normalize_post_url(url)
+            self.assertIsNone(err, f"Unexpected error for {url}: {err}")
+            self.assertTrue(normalized.startswith("https://"))
+
 
 if __name__ == "__main__":
     unittest.main()

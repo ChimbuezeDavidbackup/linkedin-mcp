@@ -36,6 +36,7 @@ from linkedin_mcp.tools.posts import (
     create_post as _create_post,
     create_poll as _create_poll,
     get_feed as _get_feed,
+    read_post as _read_post,
     comment_on_post as _comment_on_post,
 )
 from linkedin_mcp.tools.analytics import (
@@ -423,6 +424,26 @@ async def get_feed(limit: int = 5) -> Dict[str, Any]:
         limit: Number of posts to read (default: 5, max: 15).
     """
     return await _get_feed(limit=limit)
+
+
+@mcp.tool()
+async def read_post(
+    post_url: str,
+    include_comments: bool = False,
+    comment_limit: int = 5
+) -> Dict[str, Any]:
+    """Read a specific LinkedIn post or Pulse article by its URL within your authenticated session (strictly read-only).
+
+    Args:
+        post_url: The LinkedIn post URL (/posts/..., /feed/update/..., /pulse/..., or lnkd.in/...).
+        include_comments: Whether to also extract top visible comments (default: False).
+        comment_limit: Maximum number of comments to return when include_comments is True (default: 5, max: 20).
+    """
+    return await _read_post(
+        post_url=post_url,
+        include_comments=include_comments,
+        comment_limit=comment_limit,
+    )
 
 
 @mcp.tool()
