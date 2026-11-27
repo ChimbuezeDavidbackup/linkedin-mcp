@@ -154,8 +154,8 @@ All tools enforce `@require_auth` and operate strictly within your authenticated
 | **Self-Profile** | `get_my_profile` | *(none)* | Reads your authenticated profile details. |
 | *(Locked to `/in/me`)* | `update_my_headline` | `headline` | Updates your profile headline. |
 | | `update_my_about` | `summary` | Updates your About summary. |
-| | `add_education` | `school`, `degree`, `field_of_study`, `start_year`, `end_year`, ... | Adds an education entry. |
-| | `add_experience` | `title`, `company`, `employment_type`, `location`, `description`, ... | Adds a work experience entry. |
+| | `add_education` | `school`, `degree`, `field_of_study`, `start_year`, `end_year` <details><summary>Show all 10 args</summary>`school`, `degree`, `field_of_study`, `start_month`, `start_year`, `end_month`, `end_year`, `grade`, `activities`, `description`</details> | Adds an education entry. |
+| | `add_experience` | `title`, `company`, `employment_type`, `location`, `description` <details><summary>Show all 11 args</summary>`title`, `company`, `employment_type`, `location`, `location_type`, `is_current`, `start_month`, `start_year`, `end_month`, `end_year`, `description`</details> | Adds a work experience entry. |
 | | `add_skill` | `skill_name` | Adds a skill to your profile. |
 | | `add_project` | `title`, `description`, `url`, `start_year`, `end_year` | Adds a project to your profile. |
 | | `update_job_preferences` | `job_titles`, `location_types`, `locations`, `employment_types` | Updates "Open to work" preferences. |
