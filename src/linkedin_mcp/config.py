@@ -2,8 +2,15 @@
 
 import os
 from pathlib import Path
-from typing import Optional
+from typing import List, Optional
 from pydantic import BaseModel, Field
+
+
+def _parse_csv_env(name: str, default: List[str]) -> List[str]:
+    raw = os.getenv(name, "").strip()
+    if not raw:
+        return list(default)
+    return [item.strip() for item in raw.split(",") if item.strip()]
 
 
 class Settings(BaseModel):
@@ -19,7 +26,7 @@ class Settings(BaseModel):
     # Session files
     @property
     def storage_state_file(self) -> Path:
-        """Path to Playwright storage state JSON (cookies, local storage)."""
+        """Path to Playwright storage state (encrypted at rest)."""
         return self.data_dir / "storage_state.json"
 
     @property
@@ -31,6 +38,21 @@ class Settings(BaseModel):
     def browser_profile_dir(self) -> Path:
         """Persistent browser profile directory."""
         return self.data_dir / "browser_profile"
+
+    @property
+    def session_key_file(self) -> Path:
+        """Path to local Fernet key file for encrypting session state at rest."""
+        return self.data_dir / ".session.key"
+
+    @property
+    def auth_token_file(self) -> Path:
+        """Path to persistent Bearer token for HTTP/SSE transports."""
+        return self.data_dir / "auth_token"
+
+    @property
+    def rate_limits_file(self) -> Path:
+        """Path to daily action rate-limit counters."""
+        return self.data_dir / "rate_limits.json"
 
     # Browser automation settings
     browser_channel: Optional[str] = Field(
@@ -45,6 +67,37 @@ class Settings(BaseModel):
     )
     timeout_ms: int = Field(
         default_factory=lambda: int(os.getenv("LINKEDIN_TIMEOUT_MS", "30000"))
+    )
+    browser_idle_timeout_seconds: int = Field(
+        default_factory=lambda: int(os.getenv("LINKEDIN_BROWSER_IDLE_TIMEOUT_S", "300"))
+    )
+    timezone_id: Optional[str] = Field(
+        default_factory=lambda: os.getenv("LINKEDIN_TIMEZONE_ID") or None
+    )
+
+    # HTTP / Transport security settings
+    mcp_auth_token: Optional[str] = Field(
+        default_factory=lambda: os.getenv("LINKEDIN_MCP_AUTH_TOKEN") or None
+    )
+    allowed_origins: List[str] = Field(
+        default_factory=lambda: _parse_csv_env(
+            "LINKEDIN_MCP_ALLOWED_ORIGINS",
+            ["https://grok.com", "https://x.com"],
+        )
+    )
+
+    # Daily safety rate limits
+    max_daily_invites: int = Field(
+        default_factory=lambda: int(os.getenv("LINKEDIN_MAX_DAILY_INVITES", "20"))
+    )
+    max_daily_messages: int = Field(
+        default_factory=lambda: int(os.getenv("LINKEDIN_MAX_DAILY_MESSAGES", "30"))
+    )
+    max_daily_posts: int = Field(
+        default_factory=lambda: int(os.getenv("LINKEDIN_MAX_DAILY_POSTS", "10"))
+    )
+    max_daily_comments: int = Field(
+        default_factory=lambda: int(os.getenv("LINKEDIN_MAX_DAILY_COMMENTS", "25"))
     )
 
     # URLs

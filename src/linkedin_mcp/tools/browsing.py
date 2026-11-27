@@ -6,6 +6,7 @@ from typing import Any, Dict, List, Optional
 
 from linkedin_mcp.auth.session_guard import require_auth
 from linkedin_mcp.auth.manager import AccountIdentity
+from linkedin_mcp.auth.safety import attach_untrusted_notice
 from linkedin_mcp.browser.engine import browser_manager
 from linkedin_mcp.browser.stealth import human_delay, human_scroll
 
@@ -213,7 +214,7 @@ async def view_profile(
                 if text:
                     experiences.append(text.replace("\n\n", "\n"))
 
-        return {
+        return attach_untrusted_notice({
             "success": True,
             "boundary": f"Viewed as {account_identity.name if account_identity else 'authenticated user'}",
             "profile_url": page.url,
@@ -222,4 +223,67 @@ async def view_profile(
             "location": location,
             "about": about,
             "experiences": experiences
-        }
+        })
+
+
+@require_auth
+async def view_company(
+    company_url: str,
+    account_identity: AccountIdentity = None,
+) -> Dict[str, Any]:
+    """View a LinkedIn Company Page in read-only mode (overview, industry, size, headquarters)."""
+    if not company_url or not company_url.strip():
+        return {"success": False, "error": "EMPTY_URL", "message": "Company URL or slug is required."}
+
+    target = company_url.strip()
+    if not target.startswith("http"):
+        target = f"https://www.linkedin.com/company/{target.strip('/')}/about/"
+    elif "/about" not in target:
+        target = target.rstrip("/") + "/about/"
+
+    async with browser_manager.get_page(headless=True) as page:
+        await page.goto(target, wait_until="domcontentloaded")
+        await human_delay(2.0, 3.5)
+
+        from linkedin_mcp.browser.checkpoint import detect_checkpoint
+        checkpoint = await detect_checkpoint(page)
+        if checkpoint:
+            return checkpoint
+
+        name = ""
+        name_elem = page.locator("h1.org-top-card-summary__title, h1").first
+        if await name_elem.count() > 0:
+            name = (await name_elem.inner_text()).strip()
+
+        tagline = ""
+        tag_elem = page.locator("p.org-top-card-summary__tagline").first
+        if await tag_elem.count() > 0:
+            tagline = (await tag_elem.inner_text()).strip()
+
+        overview = ""
+        about_elem = page.locator("section.org-about-module p, p.break-words").first
+        if await about_elem.count() > 0:
+            overview = (await about_elem.inner_text()).strip()
+
+        details = await page.evaluate("""() => {
+            const out = {};
+            const dts = document.querySelectorAll('dl.overflow-hidden dt');
+            dts.forEach(dt => {
+                const dd = dt.nextElementSibling;
+                if (dd && dd.tagName === 'DD') {
+                    out[dt.innerText.trim().toLowerCase()] = dd.innerText.trim();
+                }
+            });
+            return out;
+        }""")
+
+        return attach_untrusted_notice({
+            "success": True,
+            "read_only": True,
+            "boundary": f"Viewed as {account_identity.name if account_identity else 'authenticated user'}",
+            "company_url": page.url,
+            "name": name,
+            "tagline": tagline,
+            "overview": overview,
+            "details": details,
+        })

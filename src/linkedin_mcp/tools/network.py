@@ -5,6 +5,7 @@ from typing import Any, Dict, List, Optional
 
 from linkedin_mcp.auth.session_guard import require_auth
 from linkedin_mcp.auth.manager import AccountIdentity
+from linkedin_mcp.auth.rate_limiter import rate_limiter
 from linkedin_mcp.browser.engine import browser_manager
 from linkedin_mcp.browser.stealth import human_delay, human_type
 from linkedin_mcp.config import config
@@ -16,6 +17,7 @@ logger = logging.getLogger("linkedin_mcp.tools.network")
 async def send_connection_request(
     profile_url: str,
     custom_note: str = "",
+    dry_run: bool = False,
     account_identity: AccountIdentity = None
 ) -> Dict[str, Any]:
     """Send a LinkedIn connection invitation to a professional from your authenticated account.
@@ -23,6 +25,7 @@ async def send_connection_request(
     Args:
         profile_url: The target profile URL to connect with.
         custom_note: Optional personalized message (up to 300 characters).
+        dry_run: If True, validate and preview the invitation without sending it.
 
     Returns:
         Status result of the connection request.
@@ -33,6 +36,19 @@ async def send_connection_request(
     target = profile_url.strip()
     if not target.startswith("http"):
         target = f"https://www.linkedin.com/in/{target.strip('/')}/"
+
+    if dry_run:
+        return {
+            "success": True,
+            "dry_run": True,
+            "target_profile": target,
+            "custom_note": custom_note.strip()[:300] if custom_note else "",
+            "message": "Dry-run mode: connection request validated and ready to send.",
+        }
+
+    limit_error = rate_limiter.check_and_increment("invite")
+    if limit_error:
+        return limit_error
 
     async with browser_manager.get_page(headless=True) as page:
         await page.goto(target, wait_until="domcontentloaded")
@@ -200,4 +216,97 @@ async def manage_invitation(
             "message": f"Successfully executed '{action_norm}' on invitation from {sender_name}.",
             "sender": sender_name,
             "action": action_norm
+        }
+
+
+@require_auth
+async def withdraw_connection_request(
+    profile_url: str,
+    account_identity: AccountIdentity = None,
+) -> Dict[str, Any]:
+    """Withdraw a pending sent connection invitation for a target profile."""
+    if not profile_url or not profile_url.strip():
+        return {"success": False, "error": "EMPTY_URL", "message": "Profile URL is required."}
+
+    target = profile_url.strip()
+    if not target.startswith("http"):
+        target = f"https://www.linkedin.com/in/{target.strip('/')}/"
+
+    async with browser_manager.get_page(headless=True) as page:
+        await page.goto(target, wait_until="domcontentloaded")
+        await human_delay(2.0, 3.0)
+
+        pending_btn = page.locator("main button:has-text('Pending'), main button[aria-label*='Pending' i]").first
+        if await pending_btn.count() == 0:
+            return {"success": False, "error": "NO_PENDING_INVITE", "message": "No pending outgoing invitation found on this profile."}
+
+        await pending_btn.click()
+        await human_delay(0.8, 1.5)
+
+        withdraw_btn = page.locator("div.artdeco-modal button:has-text('Withdraw'), button:has-text('Withdraw')").first
+        if await withdraw_btn.count() == 0:
+            return {"success": False, "error": "WITHDRAW_BUTTON_NOT_FOUND", "message": "Could not locate the Withdraw confirmation button."}
+
+        await withdraw_btn.click()
+        await human_delay(1.5, 2.5)
+        return {
+            "success": True,
+            "target_profile": page.url,
+            "message": "Pending connection invitation withdrawn.",
+        }
+
+
+@require_auth
+async def endorse_skill(
+    profile_url: str,
+    skill_name: str,
+    account_identity: AccountIdentity = None,
+) -> Dict[str, Any]:
+    """Endorse a specific skill on a 1st-degree connection's LinkedIn profile."""
+    if not profile_url or not profile_url.strip():
+        return {"success": False, "error": "EMPTY_URL", "message": "Profile URL is required."}
+    if not skill_name or not skill_name.strip():
+        return {"success": False, "error": "EMPTY_SKILL", "message": "Skill name is required."}
+
+    target = profile_url.strip()
+    if not target.startswith("http"):
+        target = f"https://www.linkedin.com/in/{target.strip('/')}/"
+    skills_url = target.rstrip("/") + "/details/skills/"
+
+    async with browser_manager.get_page(headless=True) as page:
+        await page.goto(skills_url, wait_until="domcontentloaded")
+        await human_delay(2.0, 3.0)
+
+        skill_items = page.locator("li.pvs-list__paged-list-item")
+        total = await skill_items.count()
+        needle = skill_name.strip().lower()
+
+        for i in range(min(total, 30)):
+            item = skill_items.nth(i)
+            text = (await item.inner_text()).lower()
+            if needle in text:
+                endorse_btn = item.locator("button:has-text('Endorse')").first
+                if await endorse_btn.count() > 0:
+                    await endorse_btn.click()
+                    await human_delay(1.0, 2.0)
+                    return {
+                        "success": True,
+                        "target_profile": target,
+                        "skill": skill_name.strip(),
+                        "message": f"Endorsed '{skill_name.strip()}' on profile.",
+                    }
+                endorsed_btn = item.locator("button:has-text('Endorsed')").first
+                if await endorsed_btn.count() > 0:
+                    return {
+                        "success": True,
+                        "already_endorsed": True,
+                        "target_profile": target,
+                        "skill": skill_name.strip(),
+                        "message": f"Skill '{skill_name.strip()}' is already endorsed.",
+                    }
+
+        return {
+            "success": False,
+            "error": "SKILL_NOT_FOUND",
+            "message": f"Could not find an endorsable skill matching '{skill_name.strip()}' (note: you can only endorse 1st-degree connections).",
         }

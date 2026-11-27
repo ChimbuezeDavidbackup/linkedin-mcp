@@ -5,6 +5,8 @@ from typing import Any, Dict, List, Optional
 
 from linkedin_mcp.auth.session_guard import require_auth
 from linkedin_mcp.auth.manager import AccountIdentity
+from linkedin_mcp.auth.rate_limiter import rate_limiter
+from linkedin_mcp.auth.safety import attach_untrusted_notice
 from linkedin_mcp.browser.engine import browser_manager
 from linkedin_mcp.browser.stealth import human_delay, human_type
 from linkedin_mcp.config import config
@@ -75,6 +77,7 @@ async def list_conversations(
 async def send_message(
     recipient_profile_url: str,
     message_text: str,
+    dry_run: bool = False,
     account_identity: AccountIdentity = None
 ) -> Dict[str, Any]:
     """Send a direct message to a LinkedIn member from your authenticated account.
@@ -82,6 +85,7 @@ async def send_message(
     Args:
         recipient_profile_url: Profile URL of the person to message (e.g. 'https://www.linkedin.com/in/username').
         message_text: The message body to send.
+        dry_run: If True, validate and preview the message without sending it.
 
     Returns:
         Status result indicating whether the message was dispatched.
@@ -95,6 +99,19 @@ async def send_message(
     target = recipient_profile_url.strip()
     if not target.startswith("http"):
         target = f"https://www.linkedin.com/in/{target.strip('/')}/"
+
+    if dry_run:
+        return {
+            "success": True,
+            "dry_run": True,
+            "recipient": target,
+            "message_preview": message_text.strip(),
+            "message": "Dry-run mode: message validated and ready to send.",
+        }
+
+    limit_error = rate_limiter.check_and_increment("message")
+    if limit_error:
+        return limit_error
 
     async with browser_manager.get_page(headless=True) as page:
         await page.goto(target, wait_until="domcontentloaded")
@@ -251,10 +268,10 @@ async def get_conversation_messages(
             except Exception as e:
                 logger.debug(f"Error parsing message {i}: {e}")
 
-        return {
+        return attach_untrusted_notice({
             "success": True,
             "boundary": f"Inbox thread for {account_identity.name if account_identity else 'authenticated user'}",
             "contact": recipient_name,
             "message_count": len(messages),
             "messages": messages
-        }
+        })

@@ -2,7 +2,6 @@
 
 import asyncio
 import random
-from typing import Optional
 from playwright.async_api import Page, Locator
 
 
@@ -14,15 +13,18 @@ DEFAULT_USER_AGENT = (
 
 
 async def apply_stealth(page: Page) -> None:
-    """Apply browser stealth scripts to hide automation indicators."""
-    # Hide automation flags in the navigator object
+    """Apply playwright-stealth (when available) and baseline navigator hardening."""
+    try:
+        from playwright_stealth import stealth_async
+        await stealth_async(page)
+    except Exception:
+        pass
+
     await page.add_init_script("""
-        // Overwrite the 'webdriver' property
         Object.defineProperty(navigator, 'webdriver', {
             get: () => undefined
         });
 
-        // Mock chrome object
         window.chrome = {
             runtime: {},
             loadTimes: function() {},
@@ -30,12 +32,10 @@ async def apply_stealth(page: Page) -> None:
             app: {}
         };
 
-        // Fake plugins length
         Object.defineProperty(navigator, 'plugins', {
             get: () => [1, 2, 3, 4, 5]
         });
 
-        // Fake languages
         Object.defineProperty(navigator, 'languages', {
             get: () => ['en-US', 'en']
         });
@@ -48,6 +48,20 @@ async def human_delay(min_seconds: float = 1.0, max_seconds: float = 2.5) -> Non
     await asyncio.sleep(delay)
 
 
+async def human_move_and_click(page: Page, locator: Locator) -> None:
+    """Move the mouse smoothly toward a locator's bounding box before clicking."""
+    try:
+        box = await locator.bounding_box()
+        if box:
+            target_x = box["x"] + box["width"] * random.uniform(0.25, 0.75)
+            target_y = box["y"] + box["height"] * random.uniform(0.25, 0.75)
+            await page.mouse.move(target_x, target_y, steps=random.randint(8, 16))
+            await human_delay(0.05, 0.18)
+    except Exception:
+        pass
+    await locator.click()
+
+
 async def human_type(
     locator: Locator,
     text: str,
@@ -58,7 +72,6 @@ async def human_type(
     """Type text into an input field with randomized keypress intervals."""
     if clear_first:
         await locator.click()
-        # Select all and delete
         await locator.press("ControlOrMeta+a")
         await locator.press("Backspace")
         await human_delay(0.2, 0.5)

@@ -18,6 +18,12 @@ $serverProcess = Start-Process -FilePath "uv" -ArgumentList "run", "linkedin-mcp
 
 Start-Sleep -Seconds 3
 
+$tokenFile = Join-Path $env:USERPROFILE ".linkedin_mcp\auth_token"
+$authToken = $env:LINKEDIN_MCP_AUTH_TOKEN
+if (-not $authToken -and (Test-Path $tokenFile)) {
+    $authToken = (Get-Content $tokenFile -Raw).Trim()
+}
+
 # 2. Launch Cloudflare Tunnel
 $cloudflaredPath = "C:\Program Files (x86)\cloudflared\cloudflared.exe"
 if (-not (Test-Path $cloudflaredPath)) {
@@ -27,7 +33,12 @@ if (-not (Test-Path $cloudflaredPath)) {
 Write-Host "[2/2] Launching Cloudflare Tunnel..." -ForegroundColor Yellow
 Write-Host "==================================================" -ForegroundColor Cyan
 Write-Host "IMPORTANT: In Grok.com/connectors, enter the URL with /mcp at the end!" -ForegroundColor Magenta
-Write-Host "Example: https://<name>.trycloudflare.com/mcp" -ForegroundColor Green
+if ($authToken) {
+    Write-Host "Example URL: https://<name>.trycloudflare.com/mcp?token=$authToken" -ForegroundColor Green
+    Write-Host "Or Header:   Authorization: Bearer $authToken" -ForegroundColor Green
+} else {
+    Write-Host "Example: https://<name>.trycloudflare.com/mcp" -ForegroundColor Green
+}
 Write-Host "==================================================`n" -ForegroundColor Cyan
 
 try {

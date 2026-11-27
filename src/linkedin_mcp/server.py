@@ -31,6 +31,12 @@ from linkedin_mcp.tools.self_profile import (
 from linkedin_mcp.tools.browsing import (
     search_people as _search_people,
     view_profile as _view_profile,
+    view_company as _view_company,
+)
+from linkedin_mcp.tools.jobs import (
+    search_jobs as _search_jobs,
+    get_job_details as _get_job_details,
+    save_job as _save_job,
 )
 from linkedin_mcp.tools.posts import (
     create_post as _create_post,
@@ -38,6 +44,9 @@ from linkedin_mcp.tools.posts import (
     get_feed as _get_feed,
     read_post as _read_post,
     comment_on_post as _comment_on_post,
+    search_posts as _search_posts,
+    react_to_post as _react_to_post,
+    repost_with_thoughts as _repost_with_thoughts,
 )
 from linkedin_mcp.tools.analytics import (
     get_post_analytics as _get_post_analytics,
@@ -52,6 +61,8 @@ from linkedin_mcp.tools.network import (
     send_connection_request as _send_connection_request,
     get_pending_invitations as _get_pending_invitations,
     manage_invitation as _manage_invitation,
+    withdraw_connection_request as _withdraw_connection_request,
+    endorse_skill as _endorse_skill,
 )
 from linkedin_mcp.tools.skills import (
     get_network_briefing as _get_network_briefing,
@@ -390,21 +401,23 @@ async def view_profile(profile_url: str) -> Dict[str, Any]:
 # ==========================================
 
 @mcp.tool()
-async def create_post(text: str, media_path: Optional[str] = None) -> Dict[str, Any]:
+async def create_post(text: str, media_path: Optional[str] = None, dry_run: bool = False) -> Dict[str, Any]:
     """Publish a post to your LinkedIn feed authored exclusively by your profile, optionally attaching an image or document.
 
     Args:
         text: The text content of your post.
         media_path: Optional path to an image (.png, .jpg) or document (.pdf) to attach.
+        dry_run: If True, validate and preview the post without publishing it.
     """
-    return await _create_post(text=text, media_path=media_path)
+    return await _create_post(text=text, media_path=media_path, dry_run=dry_run)
 
 
 @mcp.tool()
 async def create_poll(
     question: str,
     options: List[str],
-    duration: str = "1_week"
+    duration: str = "1_week",
+    dry_run: bool = False
 ) -> Dict[str, Any]:
     """Create and publish an interactive poll to your LinkedIn feed.
 
@@ -412,8 +425,9 @@ async def create_poll(
         question: The question for the poll (up to 140 chars).
         options: List of poll answer options (minimum 2, maximum 4 options, each up to 30 chars).
         duration: Duration for the poll to run: '1_day', '3_days', '1_week', or '2_weeks' (default: '1_week').
+        dry_run: If True, validate and preview the poll without publishing it.
     """
-    return await _create_poll(question=question, options=options, duration=duration)
+    return await _create_poll(question=question, options=options, duration=duration, dry_run=dry_run)
 
 
 @mcp.tool()
@@ -447,14 +461,15 @@ async def read_post(
 
 
 @mcp.tool()
-async def comment_on_post(post_url: str, comment_text: str) -> Dict[str, Any]:
+async def comment_on_post(post_url: str, comment_text: str, dry_run: bool = False) -> Dict[str, Any]:
     """Leave a comment on a LinkedIn post as your authenticated account.
 
     Args:
         post_url: The URL of the post.
         comment_text: The comment text to publish.
+        dry_run: If True, validate and preview the comment without publishing it.
     """
-    return await _comment_on_post(post_url=post_url, comment_text=comment_text)
+    return await _comment_on_post(post_url=post_url, comment_text=comment_text, dry_run=dry_run)
 
 
 # ==========================================
@@ -503,16 +518,18 @@ async def get_conversation_messages(recipient_name: str, limit: int = 10) -> Dic
 
 
 @mcp.tool()
-async def send_message(recipient_profile_url: str, message_text: str) -> Dict[str, Any]:
+async def send_message(recipient_profile_url: str, message_text: str, dry_run: bool = False) -> Dict[str, Any]:
     """Send a direct message to a LinkedIn member from your authenticated account.
 
     Args:
         recipient_profile_url: Profile URL of the recipient.
         message_text: The message body to send.
+        dry_run: If True, validate and preview the message without sending it.
     """
     return await _send_message(
         recipient_profile_url=recipient_profile_url,
-        message_text=message_text
+        message_text=message_text,
+        dry_run=dry_run
     )
 
 
@@ -521,16 +538,18 @@ async def send_message(recipient_profile_url: str, message_text: str) -> Dict[st
 # ==========================================
 
 @mcp.tool()
-async def send_connection_request(profile_url: str, custom_note: str = "") -> Dict[str, Any]:
+async def send_connection_request(profile_url: str, custom_note: str = "", dry_run: bool = False) -> Dict[str, Any]:
     """Send a connection invitation to a professional from your authenticated account.
 
     Args:
         profile_url: Profile URL of the member to connect with.
         custom_note: Optional personalized message (up to 300 characters).
+        dry_run: If True, validate and preview the invitation without sending it.
     """
     return await _send_connection_request(
         profile_url=profile_url,
-        custom_note=custom_note
+        custom_note=custom_note,
+        dry_run=dry_run
     )
 
 
@@ -571,6 +590,76 @@ async def analyze_profile_strength() -> Dict[str, Any]:
     return await _analyze_profile_strength()
 
 
+# ==========================================
+# Jobs, Company & Extended Engagement
+# ==========================================
+
+@mcp.tool()
+async def search_jobs(
+    keywords: str,
+    location: str = "",
+    remote_filter: str = "",
+    experience_level: str = "",
+    limit: int = 10,
+) -> Dict[str, Any]:
+    """Search LinkedIn Jobs through your authenticated account."""
+    return await _search_jobs(
+        keywords=keywords,
+        location=location,
+        remote_filter=remote_filter,
+        experience_level=experience_level,
+        limit=limit,
+    )
+
+
+@mcp.tool()
+async def get_job_details(job_url: str) -> Dict[str, Any]:
+    """Extract full job description and metadata for a LinkedIn job posting."""
+    return await _get_job_details(job_url=job_url)
+
+
+@mcp.tool()
+async def save_job(job_url: str) -> Dict[str, Any]:
+    """Bookmark a LinkedIn job posting to your Saved Jobs list."""
+    return await _save_job(job_url=job_url)
+
+
+@mcp.tool()
+async def view_company(company_url: str) -> Dict[str, Any]:
+    """View a LinkedIn Company Page in read-only mode (overview, industry, size, headquarters)."""
+    return await _view_company(company_url=company_url)
+
+
+@mcp.tool()
+async def search_posts(keywords: str, sort_by: str = "relevance", limit: int = 10) -> Dict[str, Any]:
+    """Search LinkedIn posts by keyword or hashtag within your authenticated session."""
+    return await _search_posts(keywords=keywords, sort_by=sort_by, limit=limit)
+
+
+@mcp.tool()
+async def react_to_post(post_url: str, reaction_type: str = "like") -> Dict[str, Any]:
+    """React to a LinkedIn post (like, celebrate, support, love, insightful, funny)."""
+    return await _react_to_post(post_url=post_url, reaction_type=reaction_type)
+
+
+@mcp.tool()
+async def repost_with_thoughts(post_url: str, commentary: str, dry_run: bool = False) -> Dict[str, Any]:
+    """Repost an existing LinkedIn post with your own commentary."""
+    return await _repost_with_thoughts(post_url=post_url, commentary=commentary, dry_run=dry_run)
+
+
+@mcp.tool()
+async def withdraw_connection_request(profile_url: str) -> Dict[str, Any]:
+    """Withdraw a pending sent connection invitation for a target profile."""
+    return await _withdraw_connection_request(profile_url=profile_url)
+
+
+@mcp.tool()
+async def endorse_skill(profile_url: str, skill_name: str) -> Dict[str, Any]:
+    """Endorse a specific skill on a 1st-degree connection's LinkedIn profile."""
+    return await _endorse_skill(profile_url=profile_url, skill_name=skill_name)
+
+
 def main() -> None:
     """Run the LinkedIn MCP Server via stdio or SSE."""
     import argparse
@@ -586,11 +675,16 @@ def main() -> None:
         import uvicorn
         from starlette.middleware.cors import CORSMiddleware
         from mcp.server.transport_security import TransportSecuritySettings
+        from linkedin_mcp.auth.http_auth import BearerAuthMiddleware, get_or_create_http_token
+        from linkedin_mcp.config import config
+
+        auth_token = get_or_create_http_token()
+        logger.info("HTTP/SSE Bearer authentication enabled (token stored in ~/.linkedin_mcp/auth_token).")
 
         security_settings = TransportSecuritySettings(
             enable_dns_rebinding_protection=False,
             allowed_hosts=["*"],
-            allowed_origins=["*"],
+            allowed_origins=config.allowed_origins,
         )
 
         if args.transport == "streamable-http":
@@ -598,13 +692,17 @@ def main() -> None:
         else:
             app = mcp.sse_app(transport_security=security_settings)
 
-        # Allow browser clients (grok.com) to access without CORS restriction
+        # Require Bearer token authentication on /mcp and /sse endpoints
+        app.add_middleware(BearerAuthMiddleware, token=auth_token, public_paths=["/"])
+
+        # Allow configured browser clients (e.g. grok.com, localhost) without wildcard origin exposure
         app.add_middleware(
             CORSMiddleware,
-            allow_origins=["*"],
+            allow_origins=config.allowed_origins,
+            allow_origin_regex=r"^https?://(localhost|127\.0\.0\.1)(:\d+)?$",
             allow_credentials=True,
-            allow_methods=["*"],
-            allow_headers=["*"],
+            allow_methods=["GET", "POST", "DELETE", "OPTIONS"],
+            allow_headers=["Authorization", "Content-Type", "Mcp-Session-Id"],
         )
 
         uvicorn.run(app, host=args.host, port=args.port)

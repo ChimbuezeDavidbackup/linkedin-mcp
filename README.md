@@ -2,7 +2,7 @@
 
 [![Model Context Protocol](https://img.shields.io/badge/MCP-Compatible-blue.svg)](https://modelcontextprotocol.io)
 [![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
-[![Tools: 30](https://img.shields.io/badge/tools-30%20available-green.svg)](#-available-mcp-tools-30-tools)
+[![Tools: 39](https://img.shields.io/badge/tools-39%20available-green.svg)](#-available-mcp-tools-39-tools)
 [![CI](https://github.com/ChimbuezeDavid/linkedin-mcp/actions/workflows/ci.yml/badge.svg)](https://github.com/ChimbuezeDavid/linkedin-mcp/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
@@ -21,11 +21,11 @@ A production-grade Model Context Protocol (MCP) server that connects your AI ass
 
 ### ✅ The Solution
 
-1. **Full 30-Tool Platform Without API Keys**: Provides your AI with complete human capabilities—profile editing, rich posting (with images/PDFs), post & Pulse article reading, interactive polls, inbox history, connection management, analytics, and executive intelligence briefings.
-2. **Native Google Chrome Stealth Engine**: Uses your computer's real, native Google Chrome installation rather than generic Chromium binaries. Strips automation markers (`navigator.webdriver`), introduces human typing delay jitter, and executes natural Bezier-curve mouse movements.
-3. **Passwordless, 2FA-Friendly Session Management**: Never asks for or stores your plaintext LinkedIn password. You log in interactively once through your real browser, solve any 2FA challenge, and the encrypted session state is saved locally to `~/.linkedin_mcp`. Built-in keep-alive telemetry extends LinkedIn's 30-day sliding activity window automatically.
-4. **Mathematical Account Boundaries**: Profile mutation tools (`update_my_headline`, `update_my_about`, `add_experience`, etc.) **do not accept a target profile parameter**. They are hardcoded to `/in/me`. It is mathematically impossible for an AI to modify an external profile.
-5. **Universal Multi-Transport Architecture**: Runs locally via `stdio` using zero-clone `uvx`, or remotely via `streamable-http` / `sse` with full CORS support and a 1-click Cloudflare Tunnel script for Grok.com.
+1. **Full 39-Tool Platform Without API Keys**: Provides your AI with complete human capabilities—profile editing, rich posting (with images/PDFs), post & Pulse article reading, post search, reactions & reposts, interactive polls, job search & saving, company research, inbox history, connection management, skill endorsements, analytics, and executive intelligence briefings.
+2. **Warm Stealth Chrome Engine**: Uses your computer's real, native Google Chrome installation with a lock-guarded warm `BrowserContext` and tab pooling for low-latency execution. Integrates `playwright-stealth`, human typing delay jitter, smooth mouse movement, and LinkedIn checkpoint/CAPTCHA detection.
+3. **Passwordless, Encrypted Session Management**: Never asks for or stores your plaintext LinkedIn password. Session cookies (`storage_state.json`) are encrypted at rest with Fernet (`~/.linkedin_mcp/.session.key`), and built-in keep-alive telemetry extends LinkedIn's 30-day sliding activity window automatically.
+4. **Mathematical Account Boundaries & Safety Guardrails**: Profile mutation tools (`update_my_headline`, `update_my_about`, `add_experience`, etc.) **do not accept a target profile parameter**. They are hardcoded to `/in/me`. High-impact actions support `dry_run=True` previews and daily rate-limiting caps.
+5. **Universal Multi-Transport Architecture**: Runs locally via `stdio` using zero-clone `uvx`, or remotely via `streamable-http` / `sse` with Bearer token authentication, restricted CORS, and a 1-click Cloudflare Tunnel script for Grok.com.
 
 ---
 
@@ -169,11 +169,11 @@ cd linkedin-mcp
   ```
 
 #### Step 2: Configure Grok.com
-1. Copy the public tunnel URL displayed in your terminal (e.g. `https://example-subdomain.trycloudflare.com`).
+1. Copy the public tunnel URL and Bearer token displayed in your terminal (the token is persisted in `~/.linkedin_mcp/auth_token`, or set via `LINKEDIN_MCP_AUTH_TOKEN`).
 2. Go to **[grok.com/connectors](https://grok.com/connectors)** in your browser.
 3. Click **Add Custom MCP Server**:
    - **Name**: `LinkedIn MCP`
-   - **URL**: `https://example-subdomain.trycloudflare.com/mcp` *(⚠️ Important: you must append `/mcp` to the end of the URL)*
+   - **URL**: `https://example-subdomain.trycloudflare.com/mcp?token=<YOUR_AUTH_TOKEN>` *(or pass `Authorization: Bearer <YOUR_AUTH_TOKEN>` header; always append `/mcp` before query params)*
 4. Click **Save** and start chatting with Grok!
 
 > [!TIP]
@@ -210,7 +210,7 @@ To configure your AI client to point to your local code:
 
 ---
 
-## 🛠️ Available MCP Tools (30 Tools)
+## 🛠️ Available MCP Tools (39 Tools)
 
 All tools operate strictly within the authenticated account boundary and enforce `@require_auth`.
 
@@ -231,19 +231,28 @@ All tools operate strictly within the authenticated account boundary and enforce
 | | `update_my_services` | `services_to_add`, `services_to_remove`, `description` | Updates client services and offerings on your profile. |
 | **Browsing & Search** | `search_people` | `keywords`, `location`, `current_company`, `limit` | Searches LinkedIn for professionals with connection degree badges (1st/2nd/3rd). |
 | | `view_profile` | `profile_url` | Reads any member's public/network profile details in read-only mode. |
+| | `view_company` | `company_url` | Reads a LinkedIn Company Page (overview, tagline, industry, size, HQ). |
+| **Jobs & Careers** | `search_jobs` | `keywords`, `location`, `remote_filter`, `experience_level`, `limit` | Searches LinkedIn Jobs with workplace and experience-level filters. |
+| | `get_job_details` | `job_url` | Extracts full job description and metadata for a job posting. |
+| | `save_job` | `job_url` | Bookmarks a LinkedIn job posting to your Saved Jobs list. |
 | **Feed, Posts & Polls** | `get_feed` | `limit` | Reads recent posts from your personal home feed. |
 | | `read_post` | `post_url`, `include_comments`, `comment_limit` | Reads a specific LinkedIn post or Pulse article by URL in read-only mode. |
-| | `create_post` | `text`, `media_path` *(optional)* | Publishes a post authored by your account, optionally attaching image/PDF. |
-| | `create_poll` | `question`, `options`, `duration` | Publishes an interactive poll to your feed (2-4 options, custom duration). |
-| | `comment_on_post` | `post_url`, `comment_text` | Comments on a post as your authenticated profile. |
+| | `search_posts` | `keywords`, `sort_by`, `limit` | Searches LinkedIn posts by keyword or hashtag. |
+| | `create_post` | `text`, `media_path`, `dry_run` | Publishes a post authored by your account, optionally attaching image/PDF. |
+| | `create_poll` | `question`, `options`, `duration`, `dry_run` | Publishes an interactive poll to your feed (2-4 options, custom duration). |
+| | `comment_on_post` | `post_url`, `comment_text`, `dry_run` | Comments on a post as your authenticated profile. |
+| | `react_to_post` | `post_url`, `reaction_type` | Reacts to a post (`like`, `celebrate`, `support`, `love`, `insightful`, `funny`). |
+| | `repost_with_thoughts` | `post_url`, `commentary`, `dry_run` | Reposts an existing post with your own commentary. |
 | **Analytics & Insights** | `get_post_analytics` | `limit` | Retrieves impressions, reactions, and comments for your recent posts. |
 | | `get_profile_views` | *(none)* | Retrieves private profile view counts and viewer demographics. |
 | **Direct Messaging** | `list_conversations` | `limit` | Lists recent direct message threads in your inbox. |
 | | `get_conversation_messages` | `recipient_name`, `limit` | Reads complete message history and replies for a specific thread. |
-| | `send_message` | `recipient_profile_url`, `message_text` | Dispatches a direct message from your account. |
-| **Network Growth** | `send_connection_request` | `profile_url`, `custom_note` | Sends a connection invitation with an optional personalized note. |
+| | `send_message` | `recipient_profile_url`, `message_text`, `dry_run` | Dispatches a direct message from your account. |
+| **Network Growth** | `send_connection_request` | `profile_url`, `custom_note`, `dry_run` | Sends a connection invitation with an optional personalized note. |
 | | `get_pending_invitations` | *(none)* | Lists incoming connection invitations received by your account. |
 | | `manage_invitation` | `sender_name`, `action` | Accepts or ignores a pending connection invitation. |
+| | `withdraw_connection_request` | `profile_url` | Withdraws a pending outgoing connection invitation. |
+| | `endorse_skill` | `profile_url`, `skill_name` | Endorses a specific skill on a 1st-degree connection's profile. |
 | **Agentic Skills** | `get_network_briefing` | `limit` | Generates a daily executive digest: inbox, invitations, analytics & feed trends. |
 | | `analyze_profile_strength` | *(none)* | Audits completeness across 6 sections and gives an actionable score & tips. |
 
@@ -259,7 +268,7 @@ uv run python -m unittest discover tests
 
 Expected output:
 ```
-Ran 15 tests in 0.062s
+Ran 25 tests in 0.142s
 
 OK
 ```
@@ -269,8 +278,20 @@ OK
 ## 🔒 Security & Privacy Invariants
 
 - **Zero Plaintext Password Exposure**: The server never prompts for, reads, or stores your LinkedIn password.
-- **Local Storage Only**: All session state, cookies, and identity caches are saved strictly to your local machine at `~/.linkedin_mcp`. No external telemetry or cloud servers are used.
+- **Encrypted Local Storage**: Session cookies (`storage_state.json`) are encrypted at rest with Fernet (`~/.linkedin_mcp/.session.key`), and all state remains strictly on your local machine at `~/.linkedin_mcp`.
+- **Authenticated Remote Transports**: `streamable-http` and `sse` endpoints require a Bearer token (`~/.linkedin_mcp/auth_token` or `LINKEDIN_MCP_AUTH_TOKEN`) and restrict CORS to configured origins (`LINKEDIN_MCP_ALLOWED_ORIGINS`).
+- **Daily Rate-Limiting & `dry_run` Mode**: Built-in daily quotas protect against automated-activity bans, and high-impact mutation tools support `dry_run=True` previews before execution.
 - **Mathematical Impossibility of Impersonation**: Self-profile editing tools are hard-coded to navigate to `/in/me/`. There is no `target_profile_url` parameter, preventing prompt-injected LLMs from altering other members' profiles.
+
+---
+
+## 📝 Update Notes (v0.2.0)
+
+- **Security:** Added HTTP/SSE Bearer token authentication, restricted CORS, Fernet encryption for `storage_state.json`, daily action rate-limiting, `dry_run` preview mode, and untrusted-content notices.
+- **Architecture:** Upgraded `BrowserManager` to a lock-guarded warm `BrowserContext` with tab pooling and idle cleanup, integrated `playwright-stealth`, and added centralized ARIA-first selectors + checkpoint/CAPTCHA detection.
+- **New Tools (+9, 39 total):** Added `search_jobs`, `get_job_details`, `save_job`, `view_company`, `search_posts`, `react_to_post`, `repost_with_thoughts`, `withdraw_connection_request`, and `endorse_skill`.
+
+See [CHANGELOG.md](CHANGELOG.md) for full details.
 
 ---
 

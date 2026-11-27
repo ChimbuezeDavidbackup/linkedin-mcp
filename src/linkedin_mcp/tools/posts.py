@@ -7,6 +7,8 @@ from typing import Any, Dict, List, Optional, Tuple
 
 from linkedin_mcp.auth.session_guard import require_auth
 from linkedin_mcp.auth.manager import AccountIdentity
+from linkedin_mcp.auth.rate_limiter import rate_limiter
+from linkedin_mcp.auth.safety import attach_untrusted_notice
 from linkedin_mcp.browser.engine import browser_manager
 from linkedin_mcp.browser.stealth import human_delay, human_scroll, human_type
 from linkedin_mcp.config import config
@@ -85,6 +87,7 @@ def _is_linkedin_host(url: str) -> bool:
 async def create_post(
     text: str,
     media_path: Optional[str] = None,
+    dry_run: bool = False,
     account_identity: AccountIdentity = None
 ) -> Dict[str, Any]:
     """Publish a new post on LinkedIn authored exclusively by your authenticated profile.
@@ -92,6 +95,7 @@ async def create_post(
     Args:
         text: The content of your post.
         media_path: Optional absolute file path to an image (.png, .jpg, .jpeg) or document (.pdf) to attach.
+        dry_run: If True, validate and preview the post without publishing it.
 
     Returns:
         Status result indicating whether the post was successfully published.
@@ -110,6 +114,19 @@ async def create_post(
                 "error": "MEDIA_NOT_FOUND",
                 "message": f"Attached media file does not exist at: {media_path}"
             }
+
+    if dry_run:
+        return {
+            "success": True,
+            "dry_run": True,
+            "post_preview": content,
+            "attached_media": str(media_file) if media_file else None,
+            "message": "Dry-run mode: post validated and ready to publish.",
+        }
+
+    limit_error = rate_limiter.check_and_increment("post")
+    if limit_error:
+        return limit_error
 
     async with browser_manager.get_page(headless=True) as page:
         await page.goto(config.feed_url, wait_until="domcontentloaded")
@@ -202,6 +219,7 @@ async def create_poll(
     question: str,
     options: List[str],
     duration: str = "1 week",
+    dry_run: bool = False,
     account_identity: AccountIdentity = None
 ) -> Dict[str, Any]:
     """Create and publish an interactive poll to your LinkedIn feed.
@@ -210,6 +228,7 @@ async def create_poll(
         question: The poll question text (max 140 characters).
         options: List of poll options (between 2 and 4 options, each max 30 chars).
         duration: Poll duration ('1 day', '3 days', '1 week', or '2 weeks'). Default is '1 week'.
+        dry_run: If True, validate and preview the poll without publishing it.
 
     Returns:
         Status result of the poll publication.
@@ -226,6 +245,20 @@ async def create_poll(
     cleaned_options = [opt.strip()[:30] for opt in options if opt and opt.strip()]
     if len(cleaned_options) < 2:
         return {"success": False, "error": "INVALID_OPTIONS", "message": "At least 2 non-empty options are required."}
+
+    if dry_run:
+        return {
+            "success": True,
+            "dry_run": True,
+            "question": question.strip()[:140],
+            "options": cleaned_options,
+            "duration": duration,
+            "message": "Dry-run mode: poll validated and ready to publish.",
+        }
+
+    limit_error = rate_limiter.check_and_increment("post")
+    if limit_error:
+        return limit_error
 
     async with browser_manager.get_page(headless=True) as page:
         await page.goto(config.feed_url, wait_until="domcontentloaded")
@@ -391,18 +424,19 @@ async def get_feed(
             if modern_posts:
                 posts.extend(modern_posts)
 
-        return {
+        return attach_untrusted_notice({
             "success": True,
             "boundary": f"Viewed from {account_identity.name if account_identity else 'authenticated'}'s feed",
             "count": len(posts),
             "posts": posts
-        }
+        })
 
 
 @require_auth
 async def comment_on_post(
     post_url: str,
     comment_text: str,
+    dry_run: bool = False,
     account_identity: AccountIdentity = None
 ) -> Dict[str, Any]:
     """Leave a comment on a LinkedIn post as the authenticated user.
@@ -410,12 +444,26 @@ async def comment_on_post(
     Args:
         post_url: The URL of the LinkedIn post.
         comment_text: The comment text to post.
+        dry_run: If True, validate and preview the comment without posting it.
 
     Returns:
         Status result of the comment operation.
     """
     if not comment_text or not comment_text.strip():
         return {"success": False, "error": "EMPTY_COMMENT", "message": "Comment cannot be empty."}
+
+    if dry_run:
+        return {
+            "success": True,
+            "dry_run": True,
+            "post_url": post_url.strip(),
+            "comment_preview": comment_text.strip(),
+            "message": "Dry-run mode: comment validated and ready to publish.",
+        }
+
+    limit_error = rate_limiter.check_and_increment("comment")
+    if limit_error:
+        return limit_error
 
     async with browser_manager.get_page(headless=True) as page:
         await page.goto(post_url.strip(), wait_until="domcontentloaded")
@@ -821,4 +869,201 @@ async def read_post(
             result["comments"] = comments
             result["comment_count_returned"] = len(comments)
 
-        return result
+        return attach_untrusted_notice(result)
+
+
+_VALID_REACTIONS = {
+    "like": "Like",
+    "celebrate": "Celebrate",
+    "support": "Support",
+    "love": "Love",
+    "insightful": "Insightful",
+    "funny": "Funny",
+}
+
+
+@require_auth
+async def search_posts(
+    keywords: str,
+    sort_by: str = "relevance",
+    limit: int = 10,
+    account_identity: AccountIdentity = None,
+) -> Dict[str, Any]:
+    """Search LinkedIn posts by keyword or hashtag within your authenticated session."""
+    if not keywords or not keywords.strip():
+        return {"success": False, "error": "EMPTY_QUERY", "message": "Search keywords cannot be empty."}
+
+    limit = max(1, min(limit, 20))
+    sort_param = "date_posted" if sort_by.strip().lower() in ("date", "latest", "recent", "date_posted") else "relevance"
+    encoded = urllib.parse.quote_plus(keywords.strip())
+    url = f"https://www.linkedin.com/search/results/content/?keywords={encoded}&sortBy=%22{sort_param}%22"
+
+    async with browser_manager.get_page(headless=True) as page:
+        await page.goto(url, wait_until="domcontentloaded")
+        await human_delay(2.0, 3.5)
+
+        from linkedin_mcp.browser.checkpoint import detect_checkpoint
+        checkpoint = await detect_checkpoint(page)
+        if checkpoint:
+            return checkpoint
+
+        await human_scroll(page, scrolls=2, distance=450)
+
+        results: List[Dict[str, str]] = []
+        cards = page.locator("div.feed-shared-update-v2, li.artdeco-card")
+        total = await cards.count()
+
+        for i in range(min(total, limit)):
+            card = cards.nth(i)
+            try:
+                author_elem = card.locator(".update-components-actor__title span[aria-hidden='true'], .update-components-actor__name").first
+                author = (await author_elem.inner_text()).strip().split("\n")[0] if await author_elem.count() > 0 else ""
+
+                text_elem = card.locator(".feed-shared-update-v2__description, .update-components-text").first
+                text = (await text_elem.inner_text()).strip() if await text_elem.count() > 0 else ""
+
+                link_elem = card.locator("a[href*='/feed/update/'], a[href*='/posts/']").first
+                href = await link_elem.get_attribute("href") if await link_elem.count() > 0 else ""
+                post_url = href.split("?")[0] if href else ""
+
+                if text or author:
+                    results.append({
+                        "author": author,
+                        "text": text[:600],
+                        "post_url": post_url,
+                    })
+            except Exception as e:
+                logger.debug(f"Error parsing search post {i}: {e}")
+
+        return attach_untrusted_notice({
+            "success": True,
+            "query": keywords.strip(),
+            "sort_by": sort_param,
+            "count": len(results),
+            "posts": results,
+        })
+
+
+@require_auth
+async def react_to_post(
+    post_url: str,
+    reaction_type: str = "like",
+    account_identity: AccountIdentity = None,
+) -> Dict[str, Any]:
+    """React to a LinkedIn post (like, celebrate, support, love, insightful, funny)."""
+    normalized_url, err = _validate_and_normalize_post_url(post_url)
+    if err:
+        return err
+
+    reaction_key = (reaction_type or "like").strip().lower()
+    if reaction_key not in _VALID_REACTIONS:
+        return {
+            "success": False,
+            "error": "INVALID_REACTION",
+            "message": f"reaction_type must be one of: {', '.join(_VALID_REACTIONS.keys())}.",
+        }
+
+    async with browser_manager.get_page(headless=True) as page:
+        await page.goto(normalized_url, wait_until="domcontentloaded")
+        await human_delay(2.0, 3.0)
+
+        from linkedin_mcp.browser.checkpoint import detect_checkpoint
+        checkpoint = await detect_checkpoint(page)
+        if checkpoint:
+            return checkpoint
+
+        like_btn = page.locator("button.react-button__trigger, button[aria-label*='React Like' i], button[aria-label*='Like' i]").first
+        if await like_btn.count() == 0:
+            return {"success": False, "error": "REACT_BUTTON_NOT_FOUND", "message": "Could not find the reaction button on this post."}
+
+        if reaction_key == "like":
+            await like_btn.click()
+        else:
+            await like_btn.hover()
+            await human_delay(0.8, 1.3)
+            label = _VALID_REACTIONS[reaction_key]
+            option_btn = page.locator(f"button[aria-label*='{label}' i]").first
+            if await option_btn.count() > 0:
+                await option_btn.click()
+            else:
+                await like_btn.click()
+
+        await human_delay(1.0, 2.0)
+        return {
+            "success": True,
+            "post_url": page.url,
+            "reaction_type": reaction_key,
+            "message": f"Reacted with '{reaction_key}' on post.",
+        }
+
+
+@require_auth
+async def repost_with_thoughts(
+    post_url: str,
+    commentary: str,
+    dry_run: bool = False,
+    account_identity: AccountIdentity = None,
+) -> Dict[str, Any]:
+    """Repost an existing LinkedIn post with your own commentary."""
+    normalized_url, err = _validate_and_normalize_post_url(post_url)
+    if err:
+        return err
+
+    if not commentary or not commentary.strip():
+        return {"success": False, "error": "EMPTY_COMMENTARY", "message": "Commentary text cannot be empty."}
+
+    if dry_run:
+        return {
+            "success": True,
+            "dry_run": True,
+            "post_url": normalized_url,
+            "commentary_preview": commentary.strip(),
+            "message": "Dry-run mode: repost with thoughts validated and ready to publish.",
+        }
+
+    limit_error = rate_limiter.check_and_increment("post")
+    if limit_error:
+        return limit_error
+
+    async with browser_manager.get_page(headless=True) as page:
+        await page.goto(normalized_url, wait_until="domcontentloaded")
+        await human_delay(2.0, 3.0)
+
+        from linkedin_mcp.browser.checkpoint import detect_checkpoint
+        checkpoint = await detect_checkpoint(page)
+        if checkpoint:
+            return checkpoint
+
+        repost_btn = page.locator("button:has-text('Repost'), button[aria-label*='Repost' i]").first
+        if await repost_btn.count() == 0:
+            return {"success": False, "error": "REPOST_BUTTON_NOT_FOUND", "message": "Could not find the Repost button."}
+
+        await repost_btn.click()
+        await human_delay(0.8, 1.5)
+
+        with_thoughts = page.locator("div.artdeco-dropdown__content *:has-text('Repost with your thoughts')").first
+        if await with_thoughts.count() == 0:
+            return {"success": False, "error": "REPOST_OPTION_NOT_FOUND", "message": "Could not find 'Repost with your thoughts' option."}
+
+        await with_thoughts.click()
+        await human_delay(1.2, 2.0)
+
+        editor = page.locator("div.ql-editor[contenteditable='true'], div[role='textbox']").first
+        if await editor.count() == 0:
+            return {"success": False, "error": "EDITOR_NOT_FOUND", "message": "Could not find repost commentary editor."}
+
+        await human_type(editor, commentary.strip())
+        await human_delay(1.0, 1.5)
+
+        submit_btn = page.locator("button.share-actions__primary-action, button:has-text('Post')").first
+        if await submit_btn.count() == 0:
+            return {"success": False, "error": "SUBMIT_NOT_FOUND", "message": "Could not find Post button in repost modal."}
+
+        await submit_btn.click()
+        await human_delay(2.0, 3.0)
+        return {
+            "success": True,
+            "post_url": normalized_url,
+            "commentary_preview": commentary.strip()[:140],
+            "message": "Successfully reposted with commentary.",
+        }

@@ -1,6 +1,6 @@
 [project]
 name = "linkedin-mcp"
-version = "0.1.0"
+version = "0.2.0"
 description = "Universal LinkedIn MCP Server operating strictly within an authenticated user's account"
 readme = "README.md"
 requires-python = ">=3.10"
@@ -10,6 +10,7 @@ dependencies = [
     "playwright-stealth>=1.0.6",
     "pydantic>=2.7.0",
     "rich>=13.7.0",
+    "cryptography>=42.0.0",
 ]
 
 [project.scripts]
