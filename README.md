@@ -56,13 +56,17 @@ Add the following `linkedin` server entry to your client's MCP config:
 ```
 
 **Where to paste this config:**
-* **Claude Desktop:** `%APPDATA%\Claude\claude_desktop_config.json` (Windows) · `~/Library/Application Support/Claude/claude_desktop_config.json` (macOS) · `~/.config/Claude/claude_desktop_config.json` (Linux)
+* **Claude Desktop:**
+  * Windows: `%APPDATA%\Claude\claude_desktop_config.json`
+  * macOS: `~/Library/Application Support/Claude/claude_desktop_config.json`
+  * Linux: `~/.config/Claude/claude_desktop_config.json`
 * **Antigravity:** Settings → MCP (`mcp_config.json`)
-* **Cursor / Windsurf:** `.cursor/mcp.json` or global MCP settings
+* **Cursor:** `.cursor/mcp.json` (project) or global MCP settings
+* **Windsurf:** `~/.codeium/windsurf/mcp_config.json`
 
 **Claude Code CLI:**
 ```bash
-claude mcp add linkedin uvx --from git+https://github.com/ChimbuezeDavidbackup/linkedin-mcp linkedin-mcp
+claude mcp add linkedin -- uvx --from git+https://github.com/ChimbuezeDavidbackup/linkedin-mcp linkedin-mcp
 ```
 
 ---
