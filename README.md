@@ -3,7 +3,7 @@
 [![Model Context Protocol](https://img.shields.io/badge/MCP-Compatible-blue.svg)](https://modelcontextprotocol.io)
 [![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
 [![Tools: 39](https://img.shields.io/badge/tools-39%20available-green.svg)](#available-mcp-tools-39-tools)
-[![CI](https://github.com/ChimbuezeDavidbackup/linkedin-mcp/actions/workflows/ci.yml/badge.svg)](https://github.com/ChimbuezeDavidbackup/linkedin-mcp/actions/workflows/ci.yml)
+[![CI](https://github.com/davidchimbueze/linkedin-mcp/actions/workflows/ci.yml/badge.svg)](https://github.com/davidchimbueze/linkedin-mcp/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
 A Model Context Protocol (MCP) server that connects AI assistants (Claude, Grok, Cursor, Windsurf, Antigravity) to your LinkedIn account using your local Google Chrome browser, encrypted session storage, and strict `/in/me` account-boundary guardrails.
@@ -25,7 +25,7 @@ A Model Context Protocol (MCP) server that connects AI assistants (Claude, Grok,
 Log in once interactively so your encrypted session is saved to `~/.linkedin_mcp`:
 
 ```bash
-uvx --from git+https://github.com/ChimbuezeDavidbackup/linkedin-mcp python -c "import asyncio; from linkedin_mcp.tools.auth import linkedin_start_login; asyncio.run(linkedin_start_login())"
+uvx --from git+https://github.com/davidchimbueze/linkedin-mcp python -c "import asyncio; from linkedin_mcp.tools.auth import linkedin_start_login; asyncio.run(linkedin_start_login())"
 ```
 
 1. A Google Chrome window opens to LinkedIn's login page.
@@ -47,7 +47,7 @@ Add the following `linkedin` server entry to your client's MCP config:
       "command": "uvx",
       "args": [
         "--from",
-        "git+https://github.com/ChimbuezeDavidbackup/linkedin-mcp",
+        "git+https://github.com/davidchimbueze/linkedin-mcp",
         "linkedin-mcp"
       ]
     }
@@ -66,7 +66,7 @@ Add the following `linkedin` server entry to your client's MCP config:
 
 **Claude Code CLI:**
 ```bash
-claude mcp add linkedin -- uvx --from git+https://github.com/ChimbuezeDavidbackup/linkedin-mcp linkedin-mcp
+claude mcp add linkedin -- uvx --from git+https://github.com/davidchimbueze/linkedin-mcp linkedin-mcp
 ```
 
 ---
@@ -76,7 +76,7 @@ claude mcp add linkedin -- uvx --from git+https://github.com/ChimbuezeDavidbacku
 Remote web clients need a public HTTPS URL with Bearer token authentication:
 
 ```bash
-git clone https://github.com/ChimbuezeDavidbackup/linkedin-mcp.git
+git clone https://github.com/davidchimbueze/linkedin-mcp.git
 cd linkedin-mcp
 ```
 
@@ -104,7 +104,7 @@ In **[grok.com/connectors](https://grok.com/connectors)**, add a Custom MCP Serv
 ### Option C: Local Development
 
 ```bash
-git clone https://github.com/ChimbuezeDavidbackup/linkedin-mcp.git
+git clone https://github.com/davidchimbueze/linkedin-mcp.git
 cd linkedin-mcp
 uv sync
 ```
@@ -209,4 +209,4 @@ uv run python -m unittest discover tests
 ## Changelog & License
 
 * See [CHANGELOG.md](CHANGELOG.md) for release notes (`v0.2.0` and earlier).
-* Licensed under the [MIT License](LICENSE). Authored by [Chimbueze (David) Okoroji](https://github.com/ChimbuezeDavidbackup).
+* Licensed under the [MIT License](LICENSE). Authored by [Chimbueze (David) Okoroji](https://github.com/davidchimbueze).
